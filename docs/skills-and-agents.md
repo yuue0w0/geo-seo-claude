@@ -318,6 +318,7 @@ These five agents run simultaneously during a `/geo audit` to reduce total runti
 | `scripts/llmstxt_generator.py` | Validates an existing `llms.txt` against the spec (H1 title, blockquote description, H2 sections, absolute URLs, descriptions) and generates a new file from site crawl data. | geo-llmstxt |
 | `scripts/generate_pdf_report.py` | Generates a multi-page PDF from a JSON audit data file using ReportLab. Renders score gauges, bar charts, color-coded tables, and an action plan. Accepts the JSON file path as a CLI argument or via stdin. Requires `reportlab`. | geo-report-pdf |
 | `scripts/crm_dashboard.py` | Renders a rich terminal dashboard for the prospect CRM. Reads `~/.geo-prospects/prospects.json` and displays pipeline stages, MRR, and prospect detail views. Requires `rich`. | geo-prospect |
+| `scripts/text_utils.py` | Shared helpers, not run directly. `response_text()` decodes fetched pages the way a browser does (BOM, then header charset, then `<meta charset>` / XML declaration), so pages served without a charset header don't turn into mojibake. `count_words()` counts Chinese and Japanese text by character instead of by spaces. | fetch_page, citability_scorer, llmstxt_generator |
 
 ---
 

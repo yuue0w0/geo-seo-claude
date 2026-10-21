@@ -87,6 +87,8 @@ The citability sub-score is itself a weighted composite of four components (weig
 
 The passage score is the sum of all five dimensions (maximum 100). The page-level citability score is the average of the top five scoring blocks, or all blocks when fewer than five exist.
 
+**Chinese and Japanese pages.** These languages don't separate words with spaces, so word counts convert CJK characters into English-word equivalents (1.7 characters ≈ 1 word, see `scripts/text_utils.py`) and the word-based thresholds above apply unchanged. Each signal also has Chinese equivalents (for example "是指…" for definitions, "研究表明…" for attributed claims, "首先/其次" for transitions, and full-width "？" for question headings). These extra patterns only run on passages that contain CJK characters, so English scores are unaffected.
+
 **Crawler Access Score** (`agents/geo-ai-visibility.md`) starts at 100 and deducts:
 - 15 points per critical crawler blocked (GPTBot, ClaudeBot, PerplexityBot, OAI-SearchBot, GoogleBot)
 - 5 points per secondary crawler blocked
