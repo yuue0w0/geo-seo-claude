@@ -48,7 +48,10 @@ def _codec_name(label):
         label = label.decode("ascii", "ignore")
     try:
         name = codecs.lookup(label.strip()).name
-    except (LookupError, AttributeError):
+        # The codec registry also contains transforms such as base64 and rot13.
+        # Only accept codecs usable for decoding a response body into text.
+        b" ".decode(name, errors="replace")
+    except (LookupError, AttributeError, UnicodeError):
         return None
     return _SUPERSETS.get(name, name)
 
@@ -119,4 +122,17 @@ def leading_words(text: str, n: int) -> str:
     total = count_words(text)
     if total <= n:
         return text
-    return text[: max(1, int(len(text) * n / total))]
+    cjk_chars = other_words = 0
+    in_other_word = False
+    for index, char in enumerate(text):
+        if _CJK.match(char):
+            cjk_chars += 1
+            in_other_word = False
+        elif char.isspace():
+            in_other_word = False
+        elif not in_other_word and re.match(r"\w", char):
+            other_words += 1
+            in_other_word = True
+        if other_words + round(cjk_chars / CJK_CHARS_PER_WORD) > n:
+            return text[:index]
+    return text

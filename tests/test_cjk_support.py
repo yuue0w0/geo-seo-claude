@@ -11,6 +11,7 @@ import os
 from unittest.mock import patch
 
 import requests
+import pytest
 
 # Ensure scripts/ is importable from the worktree
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
@@ -72,6 +73,10 @@ class TestResponseText:
         resp = _response(html.encode("gb18030"), "text/html; charset=GBK")
         assert "你好" in response_text(resp)
 
+    def test_shift_jis_meta_decodes_japanese(self):
+        html = '<meta charset="Shift_JIS"><p>日本語の文章を正しく読み取ります。</p>'
+        assert response_text(_response(html.encode("shift_jis"))) == html
+
     def test_utf8_bom(self):
         resp = _response(b"\xef\xbb\xbf" + "你好".encode("utf-8"), "text/plain")
         assert response_text(resp) == "你好"
@@ -88,6 +93,15 @@ class TestResponseText:
     def test_unknown_charset_label_is_ignored(self):
         resp = _response('<meta charset="no-such-charset"><p>你好</p>'.encode("utf-8"))
         assert "你好" in response_text(resp)
+
+    @pytest.mark.parametrize("label", ["base64", "rot13", "hex"])
+    @pytest.mark.parametrize("declaration", ["header", "meta"])
+    def test_non_text_charset_labels_are_ignored(self, label, declaration):
+        html = f'<meta charset="{label}"><p>你好</p>'
+        content_type = (
+            f"text/html; charset={label}" if declaration == "header" else "text/html"
+        )
+        assert response_text(_response(html.encode("utf-8"), content_type)) == html
 
     def test_mock_without_bytes_uses_text(self):
         class Mock:
@@ -117,6 +131,11 @@ class TestCountWords:
     def test_korean_uses_spaces(self):
         assert count_words("안녕하세요 반갑습니다") == 2
 
+    def test_japanese_without_spaces_has_multiple_words(self):
+        text = "日本語の文章を正しく数えます。"
+        assert len(text.split()) == 1
+        assert count_words(text) >= 5
+
     def test_leading_words_english_unchanged(self):
         text = " ".join(f"w{i}" for i in range(100))
         assert leading_words(text, 30) == " ".join(text.split()[:30])
@@ -125,6 +144,18 @@ class TestCountWords:
         head = leading_words(ZH_PARAGRAPH, 20)
         assert 0 < len(head) < len(ZH_PARAGRAPH)
         assert ZH_PARAGRAPH.startswith(head)
+
+    def test_leading_words_does_not_include_late_answer_in_mixed_text(self):
+        prefix = "内容优化需要清晰描述产品功能并提供可靠的数据来源。" * 5
+        text = prefix + " The answer is clear. " + "internationalization " * 100
+        head = leading_words(text, 60)
+        assert prefix.startswith(head)
+        assert count_words(head) == 60
+
+    def test_leading_words_keeps_latin_words_whole_in_mixed_text(self):
+        prefix = "internationalization " * 20
+        text = prefix + "中文" * 100
+        assert leading_words(text, 20).rstrip() == prefix.rstrip()
 
 
 # ---------------------------------------------------------------------------
@@ -190,6 +221,16 @@ ZH_WEAK = (
 
 
 class TestChineseScoring:
+
+    def test_answer_after_first_sixty_words_gets_no_early_answer_bonus(self):
+        prefix = "内容优化需要清晰描述产品功能并提供可靠的数据来源。" * 5
+        suffix = "internationalization " * 100
+        with_is = score_passage(prefix + " The answer is clear. " + suffix)
+        without_is = score_passage(prefix + " The answer stays clear. " + suffix)
+        assert (
+            with_is["breakdown"]["answer_block_quality"]
+            == without_is["breakdown"]["answer_block_quality"]
+        )
 
     def test_translation_scores_close_to_english(self):
         en = score_passage(EN_PASSAGE, "What is GEO?")
